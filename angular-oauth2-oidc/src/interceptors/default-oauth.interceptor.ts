@@ -1,21 +1,23 @@
-import { Injectable, Inject, Optional } from '@angular/core';
+import { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
+import { Injectable, Optional } from '@angular/core';
+import { Observable } from 'rxjs/Observable';
+import { catchError } from 'rxjs/operators';
+
+import { OAuthModuleConfig } from '../oauth-module.config';
 import { OAuthService } from '../oauth-service';
 import { OAuthStorage } from '../types';
-import { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest, HttpResponse, HttpErrorResponse } from '@angular/common/http';
-import {Observable} from 'rxjs/Observable';
-import { map, catchError } from 'rxjs/operators';
-import { of } from 'rxjs/observable/of';
-import { OAuthResourceServerErrorHandler } from "./resource-server-error-handler";
-import { OAuthModuleConfig } from "../oauth-module.config";
+import { OAuthResourceServerErrorHandler } from './resource-server-error-handler';
 
 @Injectable()
 export class DefaultOAuthInterceptor implements HttpInterceptor {
-    
+    private authStorage: OAuthStorage;
+
     constructor(
-        private authStorage: OAuthStorage,
+        private authService: OAuthService,
         private errorHandler: OAuthResourceServerErrorHandler,
         @Optional() private moduleConfig: OAuthModuleConfig
     ) {
+        this.authStorage = authService.getStorage();
     }
 
     private checkUrl(url: string): boolean {
@@ -24,7 +26,7 @@ export class DefaultOAuthInterceptor implements HttpInterceptor {
     }
 
     public intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-        
+
         let url = req.url.toLowerCase();
 
         if (!this.moduleConfig) return next.handle(req);
@@ -33,14 +35,14 @@ export class DefaultOAuthInterceptor implements HttpInterceptor {
         if (!this.checkUrl(url)) return next.handle(req);
 
         let sendAccessToken = this.moduleConfig.resourceServer.sendAccessToken;
-        
+
         if (sendAccessToken) {
 
             let token = this.authStorage.getItem('access_token');
             let header = 'Bearer ' + token;
 
             let headers = req.headers
-                                .set('Authorization', header);
+                .set('Authorization', header);
 
             req = req.clone({ headers });
         }
